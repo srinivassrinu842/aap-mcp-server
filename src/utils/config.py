@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # AAP Controller connection
     aap_controller_url: str = Field(
-        ...,
+        default="",
         description="AAP Controller base URL (e.g. https://controller.example.com)",
         alias="AAP_CONTROLLER_URL",
     )

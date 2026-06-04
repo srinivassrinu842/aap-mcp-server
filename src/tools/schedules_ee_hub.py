@@ -15,6 +15,7 @@ AAP API Mapping:
 """
 
 import json
+from typing import Any, Optional
 
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, ConfigDict, Field
@@ -290,7 +291,7 @@ def register_execution_environments(mcp: FastMCP):
             str: JSON with created EE id and name.
         """
         try:
-            payload = {
+            payload: dict[str, Any] = {
                 "name": params.name,
                 "description": params.description,
                 "image": params.image,

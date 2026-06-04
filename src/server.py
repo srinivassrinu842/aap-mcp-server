@@ -6,6 +6,7 @@ Enterprise-grade MCP server exposing AAP Controller REST APIs to LLMs.
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Literal, cast
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -13,19 +14,21 @@ from mcp.server.fastmcp import FastMCP
 from .prompts import aap_prompts
 from .resources import aap_resources
 from .tools import (
-    automation_hub,
     config_as_code,
     credentials,
-    execution_environments,
     inventories,
     job_templates,
     monitoring,
     organizations,
     platform_admin,
     projects,
-    schedules,
     users,
     workflows,
+)
+from .tools.schedules_ee_hub import (
+    register_automation_hub,
+    register_execution_environments,
+    register_schedules,
 )
 from .utils.audit import AuditLogger
 from .utils.auth import AAPAuthClient
@@ -101,11 +104,11 @@ users.register(mcp)
 projects.register(mcp)
 inventories.register(mcp)
 credentials.register(mcp)
-execution_environments.register(mcp)
+register_execution_environments(mcp)
 job_templates.register(mcp)
 workflows.register(mcp)
-schedules.register(mcp)
-automation_hub.register(mcp)
+register_schedules(mcp)
+register_automation_hub(mcp)
 platform_admin.register(mcp)
 monitoring.register(mcp)
 config_as_code.register(mcp)
@@ -124,7 +127,7 @@ if __name__ == "__main__":
     mcp.settings.port = port
 
     run_transport = "streamable-http" if transport in ("streamable_http", "streamable-http") else transport
-    mcp.run(transport=run_transport)
+    mcp.run(transport=cast(Literal["stdio", "sse", "streamable-http"], run_transport))
 
 
 def main():
@@ -143,4 +146,4 @@ def main():
     mcp.settings.port = port
 
     run_transport = "streamable-http" if transport in ("streamable_http", "streamable-http") else transport
-    mcp.run(transport=run_transport)
+    mcp.run(transport=cast(Literal["stdio", "sse", "streamable-http"], run_transport))

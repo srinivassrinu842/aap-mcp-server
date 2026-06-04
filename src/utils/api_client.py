@@ -182,7 +182,7 @@ async def aap_list_all(
     settings = get_settings(ctx)
     api_base = settings.aap_api_base_path
     next_url: str | None = f"{api_base}{path}"
-    query_params = {**(params or {}), "page_size": page_size}
+    query_params: dict[str, Any] | None = {**(params or {}), "page_size": page_size}
     total = 0
 
     client = get_client(ctx)
@@ -244,7 +244,7 @@ def format_job_status(job: dict) -> str:
     return f"{icons.get(status, '❓')} {status}"
 
 
-def paginate_params(page: int = 1, page_size: int = 20) -> dict[str, int]:
+def paginate_params(page: int = 1, page_size: int = 20) -> dict[str, Any]:
     """Build pagination query params."""
     return {"page": page, "page_size": page_size}
 
@@ -268,7 +268,7 @@ def require_confirmation_token(operation_id: str, description: str) -> str:
     )
 
 
-def validate_confirmation_token(token: str, operation_id: str) -> bool:
+def validate_confirmation_token(token: str | None, operation_id: str) -> bool:
     """Validate and consume a confirmation token."""
     if token and CONFIRMATION_TOKENS.get(token) == operation_id:
         del CONFIRMATION_TOKENS[token]
