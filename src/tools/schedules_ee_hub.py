@@ -15,15 +15,19 @@ AAP API Mapping:
 """
 
 import json
-from typing import Optional
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
     paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
 
 
@@ -33,8 +37,8 @@ def register_schedules(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None)
-        enabled: Optional[bool] = Field(default=None)
+        search: str | None = Field(default=None)
+        enabled: bool | None = Field(default=None)
 
     @mcp.tool(
         name="aap_list_schedules",
@@ -57,22 +61,29 @@ def register_schedules(mcp: FastMCP):
                 q["enabled"] = params.enabled
 
             data = await aap_get(ctx, "/schedules/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": s["id"],
-                        "name": s["name"],
-                        "enabled": s.get("enabled", True),
-                        "rrule": s.get("rrule", ""),
-                        "next_run": s.get("next_run"),
-                        "dtstart": s.get("dtstart"),
-                        "unified_job_template": s.get("summary_fields", {}).get("unified_job_template", {}).get("name"),
-                        "template_type": s.get("summary_fields", {}).get("unified_job_template", {}).get("unified_job_type"),
-                    }
-                    for s in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": s["id"],
+                            "name": s["name"],
+                            "enabled": s.get("enabled", True),
+                            "rrule": s.get("rrule", ""),
+                            "next_run": s.get("next_run"),
+                            "dtstart": s.get("dtstart"),
+                            "unified_job_template": s.get("summary_fields", {})
+                            .get("unified_job_template", {})
+                            .get("name"),
+                            "template_type": s.get("summary_fields", {})
+                            .get("unified_job_template", {})
+                            .get("unified_job_type"),
+                        }
+                        for s in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -81,8 +92,7 @@ def register_schedules(mcp: FastMCP):
         name: str = Field(..., min_length=1, description="Schedule name")
         unified_job_template_id: int = Field(..., ge=1, description="Job template or workflow template ID to schedule")
         rrule: str = Field(
-            ...,
-            description="RFC 5545 RRULE string. E.g.: 'DTSTART:20240101T020000Z RRULE:FREQ=DAILY;INTERVAL=1'"
+            ..., description="RFC 5545 RRULE string. E.g.: 'DTSTART:20240101T020000Z RRULE:FREQ=DAILY;INTERVAL=1'"
         )
         description: str = Field(default="")
         enabled: bool = Field(default=True)
@@ -116,23 +126,26 @@ def register_schedules(mcp: FastMCP):
                 "extra_data": params.extra_vars or "{}",
             }
             data = await aap_post(ctx, "/schedules/", payload)
-            return json.dumps({
-                "success": True,
-                "id": data["id"],
-                "name": data["name"],
-                "next_run": data.get("next_run"),
-                "enabled": data.get("enabled"),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "id": data["id"],
+                    "name": data["name"],
+                    "next_run": data.get("next_run"),
+                    "enabled": data.get("enabled"),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class UpdateScheduleInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         schedule_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None)
-        rrule: Optional[str] = Field(default=None)
-        enabled: Optional[bool] = Field(default=None)
-        extra_vars: Optional[str] = Field(default=None)
+        name: str | None = Field(default=None)
+        rrule: str | None = Field(default=None)
+        enabled: bool | None = Field(default=None)
+        extra_vars: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_schedule",
@@ -148,28 +161,35 @@ def register_schedules(mcp: FastMCP):
             str: JSON with updated schedule id, name, next_run.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "rrule": params.rrule,
-                "enabled": params.enabled,
-                "extra_data": params.extra_vars,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "rrule": params.rrule,
+                    "enabled": params.enabled,
+                    "extra_data": params.extra_vars,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/schedules/{params.schedule_id}/", payload)
-            return json.dumps({
-                "success": True,
-                "id": data["id"],
-                "name": data["name"],
-                "next_run": data.get("next_run"),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "id": data["id"],
+                    "name": data["name"],
+                    "next_run": data.get("next_run"),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class DeleteScheduleInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         schedule_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_schedule",
@@ -207,7 +227,7 @@ def register_execution_environments(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None)
+        search: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_list_execution_environments",
@@ -224,32 +244,37 @@ def register_execution_environments(mcp: FastMCP):
             if params.search:
                 q["name__icontains"] = params.search
             data = await aap_get(ctx, "/execution_environments/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": ee["id"],
-                        "name": ee["name"],
-                        "description": ee.get("description", ""),
-                        "image": ee.get("image", ""),
-                        "managed": ee.get("managed", False),
-                        "pull": ee.get("pull", "missing"),
-                        "organization": ee.get("summary_fields", {}).get("organization", {}).get("name"),
-                    }
-                    for ee in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": ee["id"],
+                            "name": ee["name"],
+                            "description": ee.get("description", ""),
+                            "image": ee.get("image", ""),
+                            "managed": ee.get("managed", False),
+                            "pull": ee.get("pull", "missing"),
+                            "organization": ee.get("summary_fields", {}).get("organization", {}).get("name"),
+                        }
+                        for ee in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class CreateEEInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         name: str = Field(..., min_length=1, description="Execution environment name")
-        image: str = Field(..., min_length=1, description="Container image URI (e.g., 'quay.io/ansible/ee-supported-rhel8:latest')")
+        image: str = Field(
+            ..., min_length=1, description="Container image URI (e.g., 'quay.io/ansible/ee-supported-rhel8:latest')"
+        )
         description: str = Field(default="")
         pull: str = Field(default="missing", description="Image pull policy: 'always', 'missing', or 'never'")
-        organization_id: Optional[int] = Field(default=None, ge=1)
-        credential_id: Optional[int] = Field(default=None, ge=1, description="Registry credential ID for private images")
+        organization_id: int | None = Field(default=None, ge=1)
+        credential_id: int | None = Field(default=None, ge=1, description="Registry credential ID for private images")
 
     @mcp.tool(
         name="aap_create_execution_environment",
@@ -284,10 +309,10 @@ def register_execution_environments(mcp: FastMCP):
     class UpdateEEInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         ee_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None)
-        image: Optional[str] = Field(default=None)
-        pull: Optional[str] = Field(default=None)
-        description: Optional[str] = Field(default=None)
+        name: str | None = Field(default=None)
+        image: str | None = Field(default=None)
+        pull: str | None = Field(default=None)
+        description: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_execution_environment",
@@ -300,12 +325,16 @@ def register_execution_environments(mcp: FastMCP):
             params (UpdateEEInput): Fields to update.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "image": params.image,
-                "pull": params.pull,
-                "description": params.description,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "image": params.image,
+                    "pull": params.pull,
+                    "description": params.description,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/execution_environments/{params.ee_id}/", payload)
@@ -316,7 +345,7 @@ def register_execution_environments(mcp: FastMCP):
     class DeleteEEInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         ee_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_execution_environment",
@@ -348,8 +377,10 @@ def register_automation_hub(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        namespace: Optional[str] = Field(default=None, description="Filter by collection namespace (e.g., 'ansible', 'community')")
-        search: Optional[str] = Field(default=None)
+        namespace: str | None = Field(
+            default=None, description="Filter by collection namespace (e.g., 'ansible', 'community')"
+        )
+        search: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_list_collections",
@@ -374,29 +405,34 @@ def register_automation_hub(mcp: FastMCP):
                 q["keywords"] = params.search
 
             # Automation Hub uses a different API path
-            import httpx
             client = ctx.request_context.lifespan_context["http_client"]
             response = await client.get("/api/automation-hub/v3/collections/", params=q)
             if response.status_code == 404:
-                return json.dumps({
-                    "note": "Automation Hub API not available at this URL. Collections endpoint requires /api/automation-hub/v3/",
-                    "tip": "Check that your AAP_CONTROLLER_URL points to a deployment with Automation Hub enabled.",
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "note": "Automation Hub API not available at this URL. Collections endpoint requires /api/automation-hub/v3/",
+                        "tip": "Check that your AAP_CONTROLLER_URL points to a deployment with Automation Hub enabled.",
+                    },
+                    indent=2,
+                )
             response.raise_for_status()
             data = response.json()
-            return json.dumps({
-                "count": data.get("meta", {}).get("count", 0),
-                "results": [
-                    {
-                        "namespace": c.get("namespace", {}).get("name"),
-                        "name": c.get("name"),
-                        "latest_version": c.get("latest_version", {}).get("version"),
-                        "download_count": c.get("download_count", 0),
-                        "deprecated": c.get("deprecated", False),
-                    }
-                    for c in data.get("data", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("meta", {}).get("count", 0),
+                    "results": [
+                        {
+                            "namespace": c.get("namespace", {}).get("name"),
+                            "name": c.get("name"),
+                            "latest_version": c.get("latest_version", {}).get("version"),
+                            "download_count": c.get("download_count", 0),
+                            "deprecated": c.get("deprecated", False),
+                        }
+                        for c in data.get("data", [])
+                    ],
+                },
+                indent=2,
+            )
         except Exception as e:
             return f"Error accessing Automation Hub: {e}"
 

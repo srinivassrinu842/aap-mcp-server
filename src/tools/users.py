@@ -18,15 +18,19 @@ AAP API Mapping:
 """
 
 import json
-from typing import Optional
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
     paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
 
 
@@ -38,8 +42,8 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None, description="Username or email substring filter")
-        is_superuser: Optional[bool] = Field(default=None, description="Filter to superusers only")
+        search: str | None = Field(default=None, description="Username or email substring filter")
+        is_superuser: bool | None = Field(default=None, description="Filter to superusers only")
 
     @mcp.tool(
         name="aap_list_users",
@@ -67,22 +71,25 @@ def register(mcp: FastMCP):
                 q["is_superuser"] = params.is_superuser
 
             data = await aap_get(ctx, "/users/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": u["id"],
-                        "username": u["username"],
-                        "email": u.get("email", ""),
-                        "first_name": u.get("first_name", ""),
-                        "last_name": u.get("last_name", ""),
-                        "is_superuser": u.get("is_superuser", False),
-                        "is_system_auditor": u.get("is_system_auditor", False),
-                        "last_login": u.get("last_login"),
-                    }
-                    for u in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": u["id"],
+                            "username": u["username"],
+                            "email": u.get("email", ""),
+                            "first_name": u.get("first_name", ""),
+                            "last_name": u.get("last_name", ""),
+                            "is_superuser": u.get("is_superuser", False),
+                            "is_system_auditor": u.get("is_system_auditor", False),
+                            "last_login": u.get("last_login"),
+                        }
+                        for u in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -110,15 +117,19 @@ def register(mcp: FastMCP):
             str: JSON with created user id and username.
         """
         try:
-            data = await aap_post(ctx, "/users/", {
-                "username": params.username,
-                "password": params.password,
-                "email": params.email,
-                "first_name": params.first_name,
-                "last_name": params.last_name,
-                "is_superuser": params.is_superuser,
-                "is_system_auditor": params.is_system_auditor,
-            })
+            data = await aap_post(
+                ctx,
+                "/users/",
+                {
+                    "username": params.username,
+                    "password": params.password,
+                    "email": params.email,
+                    "first_name": params.first_name,
+                    "last_name": params.last_name,
+                    "is_superuser": params.is_superuser,
+                    "is_system_auditor": params.is_system_auditor,
+                },
+            )
             return json.dumps({"success": True, "id": data["id"], "username": data["username"]}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"
@@ -171,7 +182,9 @@ def register(mcp: FastMCP):
         """
         try:
             await aap_post(ctx, f"/users/{params.user_id}/roles/", {"id": params.role_id, "disassociate": True})
-            return json.dumps({"success": True, "revoked_role_id": params.role_id, "from_user_id": params.user_id}, indent=2)
+            return json.dumps(
+                {"success": True, "revoked_role_id": params.role_id, "from_user_id": params.user_id}, indent=2
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -181,7 +194,7 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None)
+        search: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_list_teams",
@@ -201,18 +214,21 @@ def register(mcp: FastMCP):
             if params.search:
                 q["name__icontains"] = params.search
             data = await aap_get(ctx, "/teams/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": t["id"],
-                        "name": t["name"],
-                        "description": t.get("description", ""),
-                        "organization": t.get("summary_fields", {}).get("organization", {}).get("name"),
-                    }
-                    for t in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": t["id"],
+                            "name": t["name"],
+                            "description": t.get("description", ""),
+                            "organization": t.get("summary_fields", {}).get("organization", {}).get("name"),
+                        }
+                        for t in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -236,11 +252,15 @@ def register(mcp: FastMCP):
             str: JSON with created team id and name.
         """
         try:
-            data = await aap_post(ctx, "/teams/", {
-                "name": params.name,
-                "description": params.description,
-                "organization": params.organization_id,
-            })
+            data = await aap_post(
+                ctx,
+                "/teams/",
+                {
+                    "name": params.name,
+                    "description": params.description,
+                    "organization": params.organization_id,
+                },
+            )
             return json.dumps({"success": True, "id": data["id"], "name": data["name"]}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"
@@ -293,7 +313,9 @@ def register(mcp: FastMCP):
         """
         try:
             await aap_post(ctx, f"/teams/{params.team_id}/users/", {"id": params.user_id, "disassociate": True})
-            return json.dumps({"success": True, "removed_user_id": params.user_id, "from_team_id": params.team_id}, indent=2)
+            return json.dumps(
+                {"success": True, "removed_user_id": params.user_id, "from_team_id": params.team_id}, indent=2
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -319,29 +341,32 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, f"/users/{params.user_id}/")
-            return json.dumps({
-                "id": data["id"],
-                "username": data["username"],
-                "email": data.get("email", ""),
-                "first_name": data.get("first_name", ""),
-                "last_name": data.get("last_name", ""),
-                "is_superuser": data.get("is_superuser", False),
-                "is_system_auditor": data.get("is_system_auditor", False),
-                "last_login": data.get("last_login"),
-                "created": data.get("created"),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": data["id"],
+                    "username": data["username"],
+                    "email": data.get("email", ""),
+                    "first_name": data.get("first_name", ""),
+                    "last_name": data.get("last_name", ""),
+                    "is_superuser": data.get("is_superuser", False),
+                    "is_system_auditor": data.get("is_system_auditor", False),
+                    "last_login": data.get("last_login"),
+                    "created": data.get("created"),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class UpdateUserInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         user_id: int = Field(..., ge=1)
-        email: Optional[str] = Field(default=None)
-        first_name: Optional[str] = Field(default=None)
-        last_name: Optional[str] = Field(default=None)
-        password: Optional[str] = Field(default=None, min_length=8, description="New password")
-        is_superuser: Optional[bool] = Field(default=None)
-        is_system_auditor: Optional[bool] = Field(default=None)
+        email: str | None = Field(default=None)
+        first_name: str | None = Field(default=None)
+        last_name: str | None = Field(default=None)
+        password: str | None = Field(default=None, min_length=8, description="New password")
+        is_superuser: bool | None = Field(default=None)
+        is_system_auditor: bool | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_user",
@@ -357,14 +382,18 @@ def register(mcp: FastMCP):
             str: JSON with updated user id and username.
         """
         try:
-            payload = {k: v for k, v in {
-                "email": params.email,
-                "first_name": params.first_name,
-                "last_name": params.last_name,
-                "password": params.password,
-                "is_superuser": params.is_superuser,
-                "is_system_auditor": params.is_system_auditor,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "email": params.email,
+                    "first_name": params.first_name,
+                    "last_name": params.last_name,
+                    "password": params.password,
+                    "is_superuser": params.is_superuser,
+                    "is_system_auditor": params.is_system_auditor,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/users/{params.user_id}/", payload)
@@ -375,7 +404,7 @@ def register(mcp: FastMCP):
     class DeleteUserInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         user_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_user",
@@ -411,8 +440,8 @@ def register(mcp: FastMCP):
     class UpdateTeamInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         team_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1)
-        description: Optional[str] = Field(default=None)
+        name: str | None = Field(default=None, min_length=1)
+        description: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_team",
@@ -428,10 +457,14 @@ def register(mcp: FastMCP):
             str: JSON with updated team id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/teams/{params.team_id}/", payload)
@@ -442,7 +475,7 @@ def register(mcp: FastMCP):
     class DeleteTeamInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         team_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_team",

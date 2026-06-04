@@ -12,17 +12,20 @@ AAP API Mapping:
 """
 
 import json
-from typing import Optional
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
     paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
-
 
 SCM_TYPE_CHOICES = ["git", "svn", "insights", "archive", ""]
 
@@ -33,8 +36,8 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None, description="Filter by name substring")
-        scm_type: Optional[str] = Field(default=None, description="Filter: 'git', 'svn', 'archive'")
+        search: str | None = Field(default=None, description="Filter by name substring")
+        scm_type: str | None = Field(default=None, description="Filter: 'git', 'svn', 'archive'")
 
     @mcp.tool(
         name="aap_list_projects",
@@ -58,22 +61,25 @@ def register(mcp: FastMCP):
                 q["scm_type"] = params.scm_type
 
             data = await aap_get(ctx, "/projects/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": p["id"],
-                        "name": p["name"],
-                        "description": p.get("description", ""),
-                        "scm_type": p.get("scm_type", ""),
-                        "scm_url": p.get("scm_url", ""),
-                        "scm_branch": p.get("scm_branch", ""),
-                        "status": p.get("status", ""),
-                        "last_updated": p.get("last_updated"),
-                    }
-                    for p in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": p["id"],
+                            "name": p["name"],
+                            "description": p.get("description", ""),
+                            "scm_type": p.get("scm_type", ""),
+                            "scm_url": p.get("scm_url", ""),
+                            "scm_branch": p.get("scm_branch", ""),
+                            "status": p.get("status", ""),
+                            "last_updated": p.get("last_updated"),
+                        }
+                        for p in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -97,22 +103,25 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, f"/projects/{params.project_id}/")
-            return json.dumps({
-                "id": data["id"],
-                "name": data["name"],
-                "description": data.get("description", ""),
-                "scm_type": data.get("scm_type"),
-                "scm_url": data.get("scm_url"),
-                "scm_branch": data.get("scm_branch"),
-                "scm_refspec": data.get("scm_refspec"),
-                "scm_clean": data.get("scm_clean"),
-                "scm_delete_on_update": data.get("scm_delete_on_update"),
-                "status": data.get("status"),
-                "last_updated": data.get("last_updated"),
-                "last_update_failed": data.get("last_update_failed"),
-                "organization": data.get("summary_fields", {}).get("organization", {}),
-                "credential": data.get("summary_fields", {}).get("credential", {}),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": data["id"],
+                    "name": data["name"],
+                    "description": data.get("description", ""),
+                    "scm_type": data.get("scm_type"),
+                    "scm_url": data.get("scm_url"),
+                    "scm_branch": data.get("scm_branch"),
+                    "scm_refspec": data.get("scm_refspec"),
+                    "scm_clean": data.get("scm_clean"),
+                    "scm_delete_on_update": data.get("scm_delete_on_update"),
+                    "status": data.get("status"),
+                    "last_updated": data.get("last_updated"),
+                    "last_update_failed": data.get("last_update_failed"),
+                    "organization": data.get("summary_fields", {}).get("organization", {}),
+                    "credential": data.get("summary_fields", {}).get("credential", {}),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -120,10 +129,10 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         name: str = Field(..., min_length=1, max_length=512, description="Project name (e.g., 'redis-automation')")
         scm_type: str = Field(..., description="SCM type: 'git', 'svn', 'archive', or '' for manual")
-        scm_url: Optional[str] = Field(default=None, description="Repository URL (e.g., 'https://github.com/org/repo')")
+        scm_url: str | None = Field(default=None, description="Repository URL (e.g., 'https://github.com/org/repo')")
         scm_branch: str = Field(default="", description="Branch, tag, or commit hash (default: repo default)")
-        organization_id: Optional[int] = Field(default=None, ge=1, description="Organization ID")
-        credential_id: Optional[int] = Field(default=None, ge=1, description="SCM credential ID for private repos")
+        organization_id: int | None = Field(default=None, ge=1, description="Organization ID")
+        credential_id: int | None = Field(default=None, ge=1, description="SCM credential ID for private repos")
         description: str = Field(default="")
         scm_clean: bool = Field(default=False, description="Remove local modifications before update")
         scm_delete_on_update: bool = Field(default=False, description="Delete and re-clone on every update")
@@ -162,13 +171,16 @@ def register(mcp: FastMCP):
                 payload["credential"] = params.credential_id
 
             data = await aap_post(ctx, "/projects/", payload)
-            return json.dumps({
-                "success": True,
-                "id": data["id"],
-                "name": data["name"],
-                "status": data.get("status"),
-                "sync_tip": f"Use aap_sync_project(project_id={data['id']}) to trigger an initial sync.",
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "id": data["id"],
+                    "name": data["name"],
+                    "status": data.get("status"),
+                    "sync_tip": f"Use aap_sync_project(project_id={data['id']}) to trigger an initial sync.",
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -193,12 +205,15 @@ def register(mcp: FastMCP):
         try:
             data = await aap_post(ctx, f"/projects/{params.project_id}/update/", {})
             update_id = data.get("id") if isinstance(data, dict) else None
-            return json.dumps({
-                "success": True,
-                "project_id": params.project_id,
-                "project_update_id": update_id,
-                "tip": f"Use aap_get_project_sync_status(update_id=<id>) to check progress.",
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "project_id": params.project_id,
+                    "project_update_id": update_id,
+                    "tip": "Use aap_get_project_sync_status(update_id=<id>) to check progress.",
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -222,23 +237,26 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, f"/project_updates/{params.update_id}/")
-            return json.dumps({
-                "update_id": data["id"],
-                "project_id": data.get("project"),
-                "status": data.get("status"),
-                "started": data.get("started"),
-                "finished": data.get("finished"),
-                "elapsed": data.get("elapsed"),
-                "failed": data.get("failed", False),
-                "result_stdout_preview": str(data.get("result_stdout", ""))[:1000],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "update_id": data["id"],
+                    "project_id": data.get("project"),
+                    "status": data.get("status"),
+                    "started": data.get("started"),
+                    "finished": data.get("finished"),
+                    "elapsed": data.get("elapsed"),
+                    "failed": data.get("failed", False),
+                    "result_stdout_preview": str(data.get("result_stdout", ""))[:1000],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class DeleteProjectInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         project_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_project",
@@ -278,10 +296,10 @@ def register(mcp: FastMCP):
     class UpdateProjectInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         project_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1)
-        description: Optional[str] = Field(default=None)
-        scm_url: Optional[str] = Field(default=None)
-        scm_branch: Optional[str] = Field(default=None)
+        name: str | None = Field(default=None, min_length=1)
+        description: str | None = Field(default=None)
+        scm_url: str | None = Field(default=None)
+        scm_branch: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_project",
@@ -297,12 +315,16 @@ def register(mcp: FastMCP):
             str: JSON with updated project id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "scm_url": params.scm_url,
-                "scm_branch": params.scm_branch,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "scm_url": params.scm_url,
+                    "scm_branch": params.scm_branch,
+                }.items()
+                if v is not None
+            }
 
             if not payload:
                 return "Error: No fields provided to update."

@@ -13,8 +13,8 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
 from collections import deque
+from typing import Any
 
 import httpx
 from mcp.server.fastmcp import Context
@@ -70,8 +70,8 @@ def get_audit_logger(ctx: Context):
 async def aap_get(
     ctx: Context,
     path: str,
-    params: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Perform a GET request against the AAP Controller API."""
     client = get_client(ctx)
     settings = get_settings(ctx)
@@ -85,15 +85,15 @@ async def aap_get(
     except httpx.HTTPStatusError as e:
         raise AAPAPIError.from_http_error(e) from e
     except httpx.TimeoutException:
-        raise AAPAPIError(f"Request timed out: GET {url}")
+        raise AAPAPIError(f"Request timed out: GET {url}") from None
 
 
 async def aap_post(
     ctx: Context,
     path: str,
-    data: Optional[Dict[str, Any]] = None,
+    data: dict[str, Any] | None = None,
     operation_name: str = "create",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Perform a POST request. Blocked in read-only mode (unless it's a read-action like launch)."""
     _check_write_allowed(ctx, operation_name)
     client = get_client(ctx)
@@ -115,8 +115,8 @@ async def aap_post(
 async def aap_patch(
     ctx: Context,
     path: str,
-    data: Dict[str, Any],
-) -> Dict[str, Any]:
+    data: dict[str, Any],
+) -> dict[str, Any]:
     """Perform a PATCH request."""
     _check_write_allowed(ctx, "update")
     client = get_client(ctx)
@@ -135,8 +135,8 @@ async def aap_patch(
 async def aap_put(
     ctx: Context,
     path: str,
-    data: Dict[str, Any],
-) -> Dict[str, Any]:
+    data: dict[str, Any],
+) -> dict[str, Any]:
     """Perform a PUT request."""
     _check_write_allowed(ctx, "update")
     client = get_client(ctx)
@@ -174,14 +174,14 @@ async def aap_delete(
 async def aap_list_all(
     ctx: Context,
     path: str,
-    params: Optional[Dict[str, Any]] = None,
+    params: dict[str, Any] | None = None,
     page_size: int = 50,
-) -> Tuple[List[Dict], int]:
+) -> tuple[list[dict], int]:
     """Fetch all pages of a list endpoint. Returns (items, total_count)."""
-    all_items: List[Dict] = []
+    all_items: list[dict] = []
     settings = get_settings(ctx)
     api_base = settings.aap_api_base_path
-    next_url: Optional[str] = f"{api_base}{path}"
+    next_url: str | None = f"{api_base}{path}"
     query_params = {**(params or {}), "page_size": page_size}
     total = 0
 
@@ -229,7 +229,7 @@ def _raise_for_status(response: httpx.Response):
     )
 
 
-def format_job_status(job: Dict) -> str:
+def format_job_status(job: dict) -> str:
     """Return emoji-annotated status string for a job."""
     status = job.get("status", "unknown")
     icons = {
@@ -244,12 +244,12 @@ def format_job_status(job: Dict) -> str:
     return f"{icons.get(status, '❓')} {status}"
 
 
-def paginate_params(page: int = 1, page_size: int = 20) -> Dict[str, int]:
+def paginate_params(page: int = 1, page_size: int = 20) -> dict[str, int]:
     """Build pagination query params."""
     return {"page": page, "page_size": page_size}
 
 
-CONFIRMATION_TOKENS: Dict[str, str] = {}
+CONFIRMATION_TOKENS: dict[str, str] = {}
 
 
 def require_confirmation_token(operation_id: str, description: str) -> str:
@@ -258,6 +258,7 @@ def require_confirmation_token(operation_id: str, description: str) -> str:
     Returns a message asking the user to confirm with the token.
     """
     import uuid
+
     token = str(uuid.uuid4())[:8].upper()
     CONFIRMATION_TOKENS[token] = operation_id
     return (
@@ -278,7 +279,7 @@ def validate_confirmation_token(token: str, operation_id: str) -> bool:
 class AAPAPIError(Exception):
     """Structured error from AAP API calls."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None):
+    def __init__(self, message: str, status_code: int | None = None):
         self.status_code = status_code
         super().__init__(message)
 

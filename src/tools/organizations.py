@@ -10,15 +10,19 @@ AAP API Mapping:
 """
 
 import json
-from typing import Optional
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete, aap_list_all,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
     paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
 
 
@@ -29,7 +33,7 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1, description="Page number")
         page_size: int = Field(default=20, ge=1, le=200, description="Results per page")
-        search: Optional[str] = Field(default=None, description="Filter by name (substring match)")
+        search: str | None = Field(default=None, description="Filter by name (substring match)")
 
     @mcp.tool(
         name="aap_list_organizations",
@@ -61,20 +65,23 @@ def register(mcp: FastMCP):
             if params.search:
                 query["name__icontains"] = params.search
             data = await aap_get(ctx, "/organizations/", params=query)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "page": params.page,
-                "page_size": params.page_size,
-                "results": [
-                    {
-                        "id": o["id"],
-                        "name": o["name"],
-                        "description": o.get("description", ""),
-                        "max_hosts": o.get("max_hosts", 0),
-                    }
-                    for o in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "page": params.page,
+                    "page_size": params.page_size,
+                    "results": [
+                        {
+                            "id": o["id"],
+                            "name": o["name"],
+                            "description": o.get("description", ""),
+                            "max_hosts": o.get("max_hosts", 0),
+                        }
+                        for o in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -105,16 +112,19 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, f"/organizations/{params.org_id}/")
-            return json.dumps({
-                "id": data["id"],
-                "name": data["name"],
-                "description": data.get("description", ""),
-                "max_hosts": data.get("max_hosts", 0),
-                "custom_virtualenv": data.get("custom_virtualenv"),
-                "created": data.get("created"),
-                "modified": data.get("modified"),
-                "summary_fields": data.get("summary_fields", {}),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": data["id"],
+                    "name": data["name"],
+                    "description": data.get("description", ""),
+                    "max_hosts": data.get("max_hosts", 0),
+                    "custom_virtualenv": data.get("custom_virtualenv"),
+                    "created": data.get("created"),
+                    "modified": data.get("modified"),
+                    "summary_fields": data.get("summary_fields", {}),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -147,11 +157,15 @@ def register(mcp: FastMCP):
             str: JSON with created organization details including id.
         """
         try:
-            data = await aap_post(ctx, "/organizations/", {
-                "name": params.name,
-                "description": params.description,
-                "max_hosts": params.max_hosts,
-            })
+            data = await aap_post(
+                ctx,
+                "/organizations/",
+                {
+                    "name": params.name,
+                    "description": params.description,
+                    "max_hosts": params.max_hosts,
+                },
+            )
             return json.dumps({"success": True, "id": data["id"], "name": data["name"]}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"
@@ -159,9 +173,9 @@ def register(mcp: FastMCP):
     class UpdateOrgInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         org_id: int = Field(..., ge=1, description="Organization ID to update")
-        name: Optional[str] = Field(default=None, min_length=1, max_length=512)
-        description: Optional[str] = Field(default=None)
-        max_hosts: Optional[int] = Field(default=None, ge=0)
+        name: str | None = Field(default=None, min_length=1, max_length=512)
+        description: str | None = Field(default=None)
+        max_hosts: int | None = Field(default=None, ge=0)
 
     @mcp.tool(
         name="aap_update_organization",
@@ -189,11 +203,15 @@ def register(mcp: FastMCP):
             str: JSON with updated organization details.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "max_hosts": params.max_hosts,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "max_hosts": params.max_hosts,
+                }.items()
+                if v is not None
+            }
 
             if not payload:
                 return "Error: No fields to update. Provide at least one of: name, description, max_hosts."
@@ -206,9 +224,8 @@ def register(mcp: FastMCP):
     class DeleteOrgInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         org_id: int = Field(..., ge=1, description="Organization ID to delete")
-        confirmation_token: Optional[str] = Field(
-            default=None,
-            description="Confirmation token from previous call. Required to execute deletion."
+        confirmation_token: str | None = Field(
+            default=None, description="Confirmation token from previous call. Required to execute deletion."
         )
 
     @mcp.tool(
@@ -245,7 +262,9 @@ def register(mcp: FastMCP):
                 name = org.get("name", f"ID {params.org_id}")
             except AAPAPIError:
                 name = f"ID {params.org_id}"
-            return require_confirmation_token(op_id, f"Delete organization '{name}' (ID: {params.org_id}) and ALL its resources")
+            return require_confirmation_token(
+                op_id, f"Delete organization '{name}' (ID: {params.org_id}) and ALL its resources"
+            )
 
         if settings.require_confirmation and not validate_confirmation_token(params.confirmation_token, op_id):
             return "Error: Invalid or expired confirmation token. Call without token to get a new one."

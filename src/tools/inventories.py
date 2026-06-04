@@ -19,15 +19,19 @@ AAP API Mapping:
 """
 
 import json
-from typing import Optional
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
     paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
 
 
@@ -37,8 +41,8 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None)
-        organization: Optional[int] = Field(default=None)
+        search: str | None = Field(default=None)
+        organization: int | None = Field(default=None)
 
     @mcp.tool(
         name="aap_list_inventories",
@@ -62,21 +66,24 @@ def register(mcp: FastMCP):
                 q["organization"] = params.organization
 
             data = await aap_get(ctx, "/inventories/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": inv["id"],
-                        "name": inv["name"],
-                        "description": inv.get("description", ""),
-                        "kind": inv.get("kind", ""),
-                        "total_hosts": inv.get("total_hosts", 0),
-                        "hosts_with_active_failures": inv.get("hosts_with_active_failures", 0),
-                        "organization": inv.get("summary_fields", {}).get("organization", {}).get("name"),
-                    }
-                    for inv in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": inv["id"],
+                            "name": inv["name"],
+                            "description": inv.get("description", ""),
+                            "kind": inv.get("kind", ""),
+                            "total_hosts": inv.get("total_hosts", 0),
+                            "hosts_with_active_failures": inv.get("hosts_with_active_failures", 0),
+                            "organization": inv.get("summary_fields", {}).get("organization", {}).get("name"),
+                        }
+                        for inv in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -104,22 +111,26 @@ def register(mcp: FastMCP):
             str: JSON with created inventory id and name.
         """
         try:
-            data = await aap_post(ctx, "/inventories/", {
-                "name": params.name,
-                "description": params.description,
-                "organization": params.organization_id,
-                "variables": params.variables,
-                "kind": params.kind,
-            })
+            data = await aap_post(
+                ctx,
+                "/inventories/",
+                {
+                    "name": params.name,
+                    "description": params.description,
+                    "organization": params.organization_id,
+                    "variables": params.variables,
+                    "kind": params.kind,
+                },
+            )
             return json.dumps({"success": True, "id": data["id"], "name": data["name"]}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class ListHostsInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-        inventory_id: Optional[int] = Field(default=None, ge=1, description="Filter by inventory ID")
-        search: Optional[str] = Field(default=None, description="Filter by hostname substring")
-        enabled: Optional[bool] = Field(default=None, description="Filter by enabled status")
+        inventory_id: int | None = Field(default=None, ge=1, description="Filter by inventory ID")
+        search: str | None = Field(default=None, description="Filter by hostname substring")
+        enabled: bool | None = Field(default=None, description="Filter by enabled status")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
 
@@ -146,22 +157,29 @@ def register(mcp: FastMCP):
                 q["inventory"] = params.inventory_id
 
             data = await aap_get(ctx, "/hosts/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": h["id"],
-                        "name": h["name"],
-                        "description": h.get("description", ""),
-                        "enabled": h.get("enabled", True),
-                        "inventory": h.get("summary_fields", {}).get("inventory", {}).get("name"),
-                        "variables": h.get("variables", ""),
-                        "has_active_failures": h.get("has_active_failures", False),
-                        "last_job": h.get("summary_fields", {}).get("recent_jobs", [{}])[0].get("status") if h.get("summary_fields", {}).get("recent_jobs") else None,
-                    }
-                    for h in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": h["id"],
+                            "name": h["name"],
+                            "description": h.get("description", ""),
+                            "enabled": h.get("enabled", True),
+                            "inventory": h.get("summary_fields", {}).get("inventory", {}).get("name"),
+                            "variables": h.get("variables", ""),
+                            "has_active_failures": h.get("has_active_failures", False),
+                            "last_job": (
+                                h.get("summary_fields", {}).get("recent_jobs", [{}])[0].get("status")
+                                if h.get("summary_fields", {}).get("recent_jobs")
+                                else None
+                            ),
+                        }
+                        for h in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -189,13 +207,17 @@ def register(mcp: FastMCP):
             str: JSON with created host id and name.
         """
         try:
-            data = await aap_post(ctx, "/hosts/", {
-                "name": params.name,
-                "description": params.description,
-                "inventory": params.inventory_id,
-                "variables": params.variables,
-                "enabled": params.enabled,
-            })
+            data = await aap_post(
+                ctx,
+                "/hosts/",
+                {
+                    "name": params.name,
+                    "description": params.description,
+                    "inventory": params.inventory_id,
+                    "variables": params.variables,
+                    "enabled": params.enabled,
+                },
+            )
             return json.dumps({"success": True, "id": data["id"], "name": data["name"]}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"
@@ -221,12 +243,16 @@ def register(mcp: FastMCP):
             str: JSON with created group id and name.
         """
         try:
-            data = await aap_post(ctx, "/groups/", {
-                "name": params.name,
-                "description": params.description,
-                "inventory": params.inventory_id,
-                "variables": params.variables,
-            })
+            data = await aap_post(
+                ctx,
+                "/groups/",
+                {
+                    "name": params.name,
+                    "description": params.description,
+                    "inventory": params.inventory_id,
+                    "variables": params.variables,
+                },
+            )
             return json.dumps({"success": True, "id": data["id"], "name": data["name"]}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"
@@ -279,14 +305,16 @@ def register(mcp: FastMCP):
         """
         try:
             await aap_post(ctx, f"/groups/{params.group_id}/hosts/", {"id": params.host_id, "disassociate": True})
-            return json.dumps({"success": True, "removed_host_id": params.host_id, "from_group_id": params.group_id}, indent=2)
+            return json.dumps(
+                {"success": True, "removed_host_id": params.host_id, "from_group_id": params.group_id}, indent=2
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class DeleteInventoryInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         inventory_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_inventory",
@@ -328,9 +356,9 @@ def register(mcp: FastMCP):
     class UpdateInventoryInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         inventory_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1)
-        description: Optional[str] = Field(default=None)
-        variables: Optional[str] = Field(default=None)
+        name: str | None = Field(default=None, min_length=1)
+        description: str | None = Field(default=None)
+        variables: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_inventory",
@@ -346,11 +374,15 @@ def register(mcp: FastMCP):
             str: JSON with updated inventory id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "variables": params.variables,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "variables": params.variables,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/inventories/{params.inventory_id}/", payload)
@@ -363,10 +395,10 @@ def register(mcp: FastMCP):
     class UpdateHostInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         host_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1)
-        description: Optional[str] = Field(default=None)
-        variables: Optional[str] = Field(default=None)
-        enabled: Optional[bool] = Field(default=None)
+        name: str | None = Field(default=None, min_length=1)
+        description: str | None = Field(default=None)
+        variables: str | None = Field(default=None)
+        enabled: bool | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_host",
@@ -382,12 +414,16 @@ def register(mcp: FastMCP):
             str: JSON with updated host id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "variables": params.variables,
-                "enabled": params.enabled,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "variables": params.variables,
+                    "enabled": params.enabled,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/hosts/{params.host_id}/", payload)
@@ -398,7 +434,7 @@ def register(mcp: FastMCP):
     class DeleteHostInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         host_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_host",
@@ -434,9 +470,9 @@ def register(mcp: FastMCP):
     class UpdateGroupInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         group_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1)
-        description: Optional[str] = Field(default=None)
-        variables: Optional[str] = Field(default=None)
+        name: str | None = Field(default=None, min_length=1)
+        description: str | None = Field(default=None)
+        variables: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_group",
@@ -452,11 +488,15 @@ def register(mcp: FastMCP):
             str: JSON with updated group id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "variables": params.variables,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "variables": params.variables,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/groups/{params.group_id}/", payload)
@@ -467,7 +507,7 @@ def register(mcp: FastMCP):
     class DeleteGroupInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         group_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_group",

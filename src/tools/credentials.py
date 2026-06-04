@@ -12,15 +12,20 @@ AAP API Mapping:
 """
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
     paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
 
 
@@ -30,8 +35,8 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None, description="Name substring filter")
-        credential_type: Optional[int] = Field(default=None, description="Filter by credential type ID")
+        search: str | None = Field(default=None, description="Name substring filter")
+        credential_type: int | None = Field(default=None, description="Filter by credential type ID")
 
     @mcp.tool(
         name="aap_list_credentials",
@@ -55,21 +60,24 @@ def register(mcp: FastMCP):
                 q["credential_type"] = params.credential_type
 
             data = await aap_get(ctx, "/credentials/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": c["id"],
-                        "name": c["name"],
-                        "description": c.get("description", ""),
-                        "kind": c.get("kind", ""),
-                        "credential_type": c.get("summary_fields", {}).get("credential_type", {}).get("name"),
-                        "organization": c.get("summary_fields", {}).get("organization", {}).get("name"),
-                        "managed": c.get("managed", False),
-                    }
-                    for c in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": c["id"],
+                            "name": c["name"],
+                            "description": c.get("description", ""),
+                            "kind": c.get("kind", ""),
+                            "credential_type": c.get("summary_fields", {}).get("credential_type", {}).get("name"),
+                            "organization": c.get("summary_fields", {}).get("organization", {}).get("name"),
+                            "managed": c.get("managed", False),
+                        }
+                        for c in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -93,27 +101,35 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, f"/credentials/{params.credential_id}/")
-            return json.dumps({
-                "id": data["id"],
-                "name": data["name"],
-                "description": data.get("description", ""),
-                "kind": data.get("kind", ""),
-                "credential_type": data.get("summary_fields", {}).get("credential_type", {}),
-                "organization": data.get("summary_fields", {}).get("organization", {}),
-                "inputs": data.get("inputs", {}),  # Secrets will be $encrypted$
-                "managed": data.get("managed", False),
-                "created": data.get("created"),
-                "modified": data.get("modified"),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": data["id"],
+                    "name": data["name"],
+                    "description": data.get("description", ""),
+                    "kind": data.get("kind", ""),
+                    "credential_type": data.get("summary_fields", {}).get("credential_type", {}),
+                    "organization": data.get("summary_fields", {}).get("organization", {}),
+                    "inputs": data.get("inputs", {}),  # Secrets will be $encrypted$
+                    "managed": data.get("managed", False),
+                    "created": data.get("created"),
+                    "modified": data.get("modified"),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class CreateCredInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         name: str = Field(..., min_length=1, max_length=512, description="Credential name")
-        credential_type_id: int = Field(..., ge=1, description="Credential type ID (use aap_list_credential_types to find)")
-        inputs: Dict[str, Any] = Field(..., description="Credential inputs matching the type schema (e.g., {'username': 'admin', 'password': 'secret'})")
-        organization_id: Optional[int] = Field(default=None, ge=1, description="Owner organization ID")
+        credential_type_id: int = Field(
+            ..., ge=1, description="Credential type ID (use aap_list_credential_types to find)"
+        )
+        inputs: dict[str, Any] = Field(
+            ...,
+            description="Credential inputs matching the type schema (e.g., {'username': 'admin', 'password': 'secret'})",
+        )
+        organization_id: int | None = Field(default=None, ge=1, description="Owner organization ID")
         description: str = Field(default="")
 
     @mcp.tool(
@@ -138,7 +154,7 @@ def register(mcp: FastMCP):
             str: JSON with created credential id and name.
         """
         try:
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "name": params.name,
                 "description": params.description,
                 "credential_type": params.credential_type_id,
@@ -155,9 +171,9 @@ def register(mcp: FastMCP):
     class UpdateCredInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         credential_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1)
-        description: Optional[str] = Field(default=None)
-        inputs: Optional[Dict[str, Any]] = Field(default=None, description="Updated inputs (only changed fields needed)")
+        name: str | None = Field(default=None, min_length=1)
+        description: str | None = Field(default=None)
+        inputs: dict[str, Any] | None = Field(default=None, description="Updated inputs (only changed fields needed)")
 
     @mcp.tool(
         name="aap_update_credential",
@@ -173,11 +189,15 @@ def register(mcp: FastMCP):
             str: JSON with updated credential id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "inputs": params.inputs,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "inputs": params.inputs,
+                }.items()
+                if v is not None
+            }
 
             if not payload:
                 return "Error: No fields to update."
@@ -190,7 +210,7 @@ def register(mcp: FastMCP):
     class DeleteCredInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         credential_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_credential",
@@ -231,7 +251,7 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=50, ge=1, le=200)
-        managed: Optional[bool] = Field(default=None, description="True = built-in types, False = custom types")
+        managed: bool | None = Field(default=None, description="True = built-in types, False = custom types")
 
     @mcp.tool(
         name="aap_list_credential_types",
@@ -255,20 +275,23 @@ def register(mcp: FastMCP):
                 q["managed"] = params.managed
 
             data = await aap_get(ctx, "/credential_types/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": ct["id"],
-                        "name": ct["name"],
-                        "kind": ct.get("kind", ""),
-                        "managed": ct.get("managed", False),
-                        "description": ct.get("description", ""),
-                        "inputs_required_fields": list(ct.get("inputs", {}).get("required", [])),
-                    }
-                    for ct in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": ct["id"],
+                            "name": ct["name"],
+                            "kind": ct.get("kind", ""),
+                            "managed": ct.get("managed", False),
+                            "description": ct.get("description", ""),
+                            "inputs_required_fields": list(ct.get("inputs", {}).get("required", [])),
+                        }
+                        for ct in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -277,13 +300,13 @@ def register(mcp: FastMCP):
         name: str = Field(..., min_length=1, description="Custom credential type name")
         kind: str = Field(default="cloud", description="Kind: 'cloud', 'net', or 'ssh'")
         description: str = Field(default="")
-        inputs: Dict[str, Any] = Field(
+        inputs: dict[str, Any] = Field(
             ...,
-            description="JSON schema for inputs (fields definition). E.g.: {'fields': [{'id': 'api_token', 'type': 'string', 'secret': true}]}"
+            description="JSON schema for inputs (fields definition). E.g.: {'fields': [{'id': 'api_token', 'type': 'string', 'secret': true}]}",
         )
-        injectors: Dict[str, Any] = Field(
+        injectors: dict[str, Any] = Field(
             default_factory=dict,
-            description="Injector mappings (env vars or extra_vars). E.g.: {'env': {'MY_TOKEN': '{{ api_token }}'}}"
+            description="Injector mappings (env vars or extra_vars). E.g.: {'env': {'MY_TOKEN': '{{ api_token }}'}}",
         )
 
     @mcp.tool(
@@ -304,13 +327,17 @@ def register(mcp: FastMCP):
             str: JSON with created credential type id and name.
         """
         try:
-            data = await aap_post(ctx, "/credential_types/", {
-                "name": params.name,
-                "kind": params.kind,
-                "description": params.description,
-                "inputs": params.inputs,
-                "injectors": params.injectors,
-            })
+            data = await aap_post(
+                ctx,
+                "/credential_types/",
+                {
+                    "name": params.name,
+                    "kind": params.kind,
+                    "description": params.description,
+                    "inputs": params.inputs,
+                    "injectors": params.injectors,
+                },
+            )
             return json.dumps({"success": True, "id": data["id"], "name": data["name"]}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"

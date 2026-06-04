@@ -3,9 +3,8 @@ Configuration management for AAP MCP Server.
 All settings are loaded from environment variables with sensible defaults.
 """
 
-from typing import Optional
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -30,17 +29,17 @@ class Settings(BaseSettings):
         description="AAP API base path (e.g. /api/controller/v2)",
         alias="AAP_API_BASE_PATH",
     )
-    aap_username: Optional[str] = Field(
+    aap_username: str | None = Field(
         default=None,
         description="AAP username for basic auth (use oauth_token instead)",
         alias="AAP_USERNAME",
     )
-    aap_password: Optional[str] = Field(
+    aap_password: str | None = Field(
         default=None,
         description="AAP password for basic auth",
         alias="AAP_PASSWORD",
     )
-    aap_oauth_token: Optional[str] = Field(
+    aap_oauth_token: str | None = Field(
         default=None,
         description="AAP OAuth2 token (preferred over username/password)",
         alias="AAP_OAUTH_TOKEN",
@@ -76,7 +75,7 @@ class Settings(BaseSettings):
     rate_limit_requests_per_minute: int = Field(default=120, ge=1)
 
     # Audit logging
-    audit_log_file: Optional[str] = Field(
+    audit_log_file: str | None = Field(
         default="/var/log/aap-mcp/audit.jsonl",
         description="Path for structured audit log. None disables file logging.",
     )
@@ -96,5 +95,3 @@ class Settings(BaseSettings):
     def mask_secrets(cls, v):
         # Secrets are stored as-is; masking happens in audit logger
         return v
-
-

@@ -19,6 +19,7 @@ def make_mock_ctx(read_only=False, require_confirmation=True):
     settings = MagicMock()
     settings.read_only_mode = read_only
     settings.require_confirmation = require_confirmation
+    settings.aap_api_base_path = "/api/v2"
 
     http_client = httpx.AsyncClient(base_url="https://controller.example.com")
 

@@ -8,7 +8,7 @@ Supports:
 """
 
 import logging
-from typing import Optional, Dict
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -23,9 +23,9 @@ class AAPAuthClient:
     def __init__(
         self,
         controller_url: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        oauth_token: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
+        oauth_token: str | None = None,
         verify_ssl: bool = True,
     ):
         self.controller_url = controller_url.rstrip("/")
@@ -33,9 +33,9 @@ class AAPAuthClient:
         self.password = password
         self._oauth_token = oauth_token
         self.verify_ssl = verify_ssl
-        self._current_user: Optional[Dict] = None
+        self._current_user: dict | None = None
 
-    async def get_auth_headers(self) -> Dict[str, str]:
+    async def get_auth_headers(self) -> dict[str, str]:
         """Return Authorization headers for API requests."""
         token = await self._resolve_token()
         return {
@@ -67,11 +67,10 @@ class AAPAuthClient:
                 return self._oauth_token
 
         raise AuthenticationError(
-            "No authentication credentials provided. "
-            "Set AAP_OAUTH_TOKEN or both AAP_USERNAME and AAP_PASSWORD."
+            "No authentication credentials provided. " "Set AAP_OAUTH_TOKEN or both AAP_USERNAME and AAP_PASSWORD."
         )
 
-    async def get_current_user(self, http_client: httpx.AsyncClient) -> Dict:
+    async def get_current_user(self, http_client: httpx.AsyncClient) -> dict:
         """Return the current authenticated user's details."""
         if self._current_user is None:
             response = await http_client.get(AAP_ME_URL)
@@ -88,4 +87,5 @@ class AAPAuthClient:
 
 class AuthenticationError(Exception):
     """Raised when AAP authentication fails."""
+
     pass

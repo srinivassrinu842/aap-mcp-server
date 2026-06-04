@@ -6,31 +6,30 @@ Enterprise-grade MCP server exposing AAP Controller REST APIs to LLMs.
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any
 
 import httpx
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp import FastMCP
 
-from .utils.auth import AAPAuthClient
-from .utils.config import Settings
-from .utils.audit import AuditLogger
+from .prompts import aap_prompts
+from .resources import aap_resources
 from .tools import (
-    organizations,
-    users,
-    projects,
-    inventories,
+    automation_hub,
+    config_as_code,
     credentials,
     execution_environments,
+    inventories,
     job_templates,
-    workflows,
-    schedules,
-    automation_hub,
-    platform_admin,
     monitoring,
-    config_as_code,
+    organizations,
+    platform_admin,
+    projects,
+    schedules,
+    users,
+    workflows,
 )
-from .resources import aap_resources
-from .prompts import aap_prompts
+from .utils.audit import AuditLogger
+from .utils.auth import AAPAuthClient
+from .utils.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -145,4 +144,3 @@ def main():
 
     run_transport = "streamable-http" if transport in ("streamable_http", "streamable-http") else transport
     mcp.run(transport=run_transport)
-

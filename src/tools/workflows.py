@@ -12,15 +12,21 @@ AAP API Mapping:
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
-    format_job_status, paginate_params,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
+    format_job_status,
+    paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
 
 
@@ -30,7 +36,7 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None)
+        search: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_list_workflow_templates",
@@ -51,20 +57,23 @@ def register(mcp: FastMCP):
                 q["name__icontains"] = params.search
 
             data = await aap_get(ctx, "/workflow_job_templates/", params=q)
-            return json.dumps({
-                "count": data.get("count", 0),
-                "results": [
-                    {
-                        "id": wf["id"],
-                        "name": wf["name"],
-                        "description": wf.get("description", ""),
-                        "organization": wf.get("summary_fields", {}).get("organization", {}).get("name"),
-                        "survey_enabled": wf.get("survey_enabled", False),
-                        "ask_variables_on_launch": wf.get("ask_variables_on_launch", False),
-                    }
-                    for wf in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "results": [
+                        {
+                            "id": wf["id"],
+                            "name": wf["name"],
+                            "description": wf.get("description", ""),
+                            "organization": wf.get("summary_fields", {}).get("organization", {}).get("name"),
+                            "survey_enabled": wf.get("survey_enabled", False),
+                            "ask_variables_on_launch": wf.get("ask_variables_on_launch", False),
+                        }
+                        for wf in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -89,33 +98,36 @@ def register(mcp: FastMCP):
         try:
             data = await aap_get(ctx, f"/workflow_job_templates/{params.workflow_id}/")
             nodes = await aap_get(ctx, f"/workflow_job_templates/{params.workflow_id}/workflow_nodes/")
-            return json.dumps({
-                "id": data["id"],
-                "name": data["name"],
-                "description": data.get("description", ""),
-                "organization": data.get("summary_fields", {}).get("organization", {}),
-                "survey_enabled": data.get("survey_enabled", False),
-                "ask_variables_on_launch": data.get("ask_variables_on_launch", False),
-                "extra_vars": data.get("extra_vars", ""),
-                "node_count": nodes.get("count", 0),
-                "nodes": [
-                    {
-                        "id": n["id"],
-                        "job_template": n.get("summary_fields", {}).get("unified_job_template", {}).get("name"),
-                        "success_nodes": n.get("success_nodes", []),
-                        "failure_nodes": n.get("failure_nodes", []),
-                        "always_nodes": n.get("always_nodes", []),
-                    }
-                    for n in nodes.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": data["id"],
+                    "name": data["name"],
+                    "description": data.get("description", ""),
+                    "organization": data.get("summary_fields", {}).get("organization", {}),
+                    "survey_enabled": data.get("survey_enabled", False),
+                    "ask_variables_on_launch": data.get("ask_variables_on_launch", False),
+                    "extra_vars": data.get("extra_vars", ""),
+                    "node_count": nodes.get("count", 0),
+                    "nodes": [
+                        {
+                            "id": n["id"],
+                            "job_template": n.get("summary_fields", {}).get("unified_job_template", {}).get("name"),
+                            "success_nodes": n.get("success_nodes", []),
+                            "failure_nodes": n.get("failure_nodes", []),
+                            "always_nodes": n.get("always_nodes", []),
+                        }
+                        for n in nodes.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class CreateWFTInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         name: str = Field(..., min_length=1, max_length=512, description="Workflow template name")
-        organization_id: Optional[int] = Field(default=None, ge=1)
+        organization_id: int | None = Field(default=None, ge=1)
         description: str = Field(default="")
         extra_vars: str = Field(default="")
         ask_variables_on_launch: bool = Field(default=False)
@@ -138,7 +150,7 @@ def register(mcp: FastMCP):
             str: JSON with created workflow id and name.
         """
         try:
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "name": params.name,
                 "description": params.description,
                 "extra_vars": params.extra_vars,
@@ -149,20 +161,23 @@ def register(mcp: FastMCP):
                 payload["organization"] = params.organization_id
 
             data = await aap_post(ctx, "/workflow_job_templates/", payload)
-            return json.dumps({
-                "success": True,
-                "id": data["id"],
-                "name": data["name"],
-                "tip": "Add workflow nodes via the AAP UI or aap_* node management tools.",
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "id": data["id"],
+                    "name": data["name"],
+                    "tip": "Add workflow nodes via the AAP UI or aap_* node management tools.",
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class LaunchWorkflowInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         workflow_id: int = Field(..., ge=1, description="Workflow template ID to launch")
-        extra_vars: Optional[str] = Field(default=None, description="Extra variables as JSON/YAML")
-        limit: Optional[str] = Field(default=None, description="Host limit pattern")
+        extra_vars: str | None = Field(default=None, description="Extra variables as JSON/YAML")
+        limit: str | None = Field(default=None, description="Host limit pattern")
 
     @mcp.tool(
         name="aap_launch_workflow",
@@ -183,7 +198,7 @@ def register(mcp: FastMCP):
             str: JSON with workflow job id, status, and monitoring tip.
         """
         try:
-            payload: Dict[str, Any] = {}
+            payload: dict[str, Any] = {}
             if params.extra_vars:
                 payload["extra_vars"] = params.extra_vars
             if params.limit:
@@ -191,12 +206,15 @@ def register(mcp: FastMCP):
 
             data = await aap_post(ctx, f"/workflow_job_templates/{params.workflow_id}/launch/", payload)
             wf_job_id = data.get("id")
-            return json.dumps({
-                "success": True,
-                "workflow_job_id": wf_job_id,
-                "status": data.get("status", "pending"),
-                "monitor_tip": f"Use aap_get_workflow_status(workflow_job_id={wf_job_id}) to check progress.",
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "workflow_job_id": wf_job_id,
+                    "status": data.get("status", "pending"),
+                    "monitor_tip": f"Use aap_get_workflow_status(workflow_job_id={wf_job_id}) to check progress.",
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -225,30 +243,35 @@ def register(mcp: FastMCP):
             nodes = []
             for n in nodes_data.get("results", []):
                 sf = n.get("summary_fields", {})
-                nodes.append({
-                    "id": n["id"],
-                    "job_template": sf.get("unified_job_template", {}).get("name"),
-                    "job_id": sf.get("job", {}).get("id"),
-                    "job_status": sf.get("job", {}).get("status"),
-                    "do_not_run": n.get("do_not_run", False),
-                })
+                nodes.append(
+                    {
+                        "id": n["id"],
+                        "job_template": sf.get("unified_job_template", {}).get("name"),
+                        "job_id": sf.get("job", {}).get("id"),
+                        "job_status": sf.get("job", {}).get("status"),
+                        "do_not_run": n.get("do_not_run", False),
+                    }
+                )
 
-            return json.dumps({
-                "workflow_job_id": data["id"],
-                "status": format_job_status(data),
-                "started": data.get("started"),
-                "finished": data.get("finished"),
-                "elapsed": data.get("elapsed"),
-                "workflow_template": data.get("summary_fields", {}).get("workflow_job_template", {}).get("name"),
-                "nodes": nodes,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "workflow_job_id": data["id"],
+                    "status": format_job_status(data),
+                    "started": data.get("started"),
+                    "finished": data.get("finished"),
+                    "elapsed": data.get("elapsed"),
+                    "workflow_template": data.get("summary_fields", {}).get("workflow_job_template", {}).get("name"),
+                    "nodes": nodes,
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class DeleteWFTInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         workflow_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_workflow_template",
@@ -290,10 +313,10 @@ def register(mcp: FastMCP):
     class UpdateWFTInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         workflow_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1, max_length=512)
-        description: Optional[str] = Field(default=None)
-        extra_vars: Optional[str] = Field(default=None)
-        ask_variables_on_launch: Optional[bool] = Field(default=None)
+        name: str | None = Field(default=None, min_length=1, max_length=512)
+        description: str | None = Field(default=None)
+        extra_vars: str | None = Field(default=None)
+        ask_variables_on_launch: bool | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_workflow_template",
@@ -309,12 +332,16 @@ def register(mcp: FastMCP):
             str: JSON with updated workflow id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "extra_vars": params.extra_vars,
-                "ask_variables_on_launch": params.ask_variables_on_launch,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "extra_vars": params.extra_vars,
+                    "ask_variables_on_launch": params.ask_variables_on_launch,
+                }.items()
+                if v is not None
+            }
             if not payload:
                 return "Error: No fields to update."
             data = await aap_patch(ctx, f"/workflow_job_templates/{params.workflow_id}/", payload)

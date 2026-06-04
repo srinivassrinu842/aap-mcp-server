@@ -11,12 +11,11 @@ AAP API Mapping:
 """
 
 import json
-from typing import Optional
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
-from ..utils.api_client import aap_get, AAPAPIError
+from ..utils.api_client import AAPAPIError, aap_get
 
 
 def register(mcp: FastMCP):
@@ -36,15 +35,18 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, "/ping/")
-            return json.dumps({
-                "status": "healthy" if data.get("ha") is not None else "unknown",
-                "ha_enabled": data.get("ha", False),
-                "version": data.get("version"),
-                "active_node": data.get("active_node"),
-                "install_uuid": data.get("install_uuid"),
-                "instances": data.get("instances", {}),
-                "instance_groups": data.get("instance_groups", {}),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "status": "healthy" if data.get("ha") is not None else "unknown",
+                    "ha_enabled": data.get("ha", False),
+                    "version": data.get("version"),
+                    "active_node": data.get("active_node"),
+                    "install_uuid": data.get("install_uuid"),
+                    "instances": data.get("instances", {}),
+                    "instance_groups": data.get("instance_groups", {}),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -62,23 +64,28 @@ def register(mcp: FastMCP):
             data = await aap_get(ctx, "/instances/")
             instances = []
             for inst in data.get("results", []):
-                instances.append({
-                    "id": inst["id"],
-                    "hostname": inst.get("hostname"),
-                    "node_type": inst.get("node_type"),
-                    "node_state": inst.get("node_state"),
-                    "capacity": inst.get("capacity", 0),
-                    "consumed_capacity": inst.get("consumed_capacity", 0),
-                    "percent_capacity_remaining": inst.get("percent_capacity_remaining"),
-                    "enabled": inst.get("enabled", True),
-                    "version": inst.get("version"),
-                })
+                instances.append(
+                    {
+                        "id": inst["id"],
+                        "hostname": inst.get("hostname"),
+                        "node_type": inst.get("node_type"),
+                        "node_state": inst.get("node_state"),
+                        "capacity": inst.get("capacity", 0),
+                        "consumed_capacity": inst.get("consumed_capacity", 0),
+                        "percent_capacity_remaining": inst.get("percent_capacity_remaining"),
+                        "enabled": inst.get("enabled", True),
+                        "version": inst.get("version"),
+                    }
+                )
             healthy = sum(1 for i in instances if i["node_state"] == "ready")
-            return json.dumps({
-                "total_nodes": len(instances),
-                "healthy_nodes": healthy,
-                "instances": instances,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "total_nodes": len(instances),
+                    "healthy_nodes": healthy,
+                    "instances": instances,
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -95,20 +102,23 @@ def register(mcp: FastMCP):
         try:
             data = await aap_get(ctx, "/config/")
             lic = data.get("license_info", {})
-            return json.dumps({
-                "license_type": lic.get("license_type"),
-                "valid_key": lic.get("valid_key"),
-                "compliant": lic.get("compliant"),
-                "date_expired": lic.get("date_expired"),
-                "date_warning": lic.get("date_warning"),
-                "free_instances": lic.get("free_instances"),
-                "total_instances": lic.get("total_instances"),
-                "current_instances": lic.get("current_instances"),
-                "available_instances": lic.get("available_instances"),
-                "time_remaining": lic.get("time_remaining"),
-                "subscription_name": lic.get("subscription_name"),
-                "product_name": lic.get("product_name"),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "license_type": lic.get("license_type"),
+                    "valid_key": lic.get("valid_key"),
+                    "compliant": lic.get("compliant"),
+                    "date_expired": lic.get("date_expired"),
+                    "date_warning": lic.get("date_warning"),
+                    "free_instances": lic.get("free_instances"),
+                    "total_instances": lic.get("total_instances"),
+                    "current_instances": lic.get("current_instances"),
+                    "available_instances": lic.get("available_instances"),
+                    "time_remaining": lic.get("time_remaining"),
+                    "subscription_name": lic.get("subscription_name"),
+                    "product_name": lic.get("product_name"),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -132,20 +142,23 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, f"/instances/{params.instance_id}/")
-            return json.dumps({
-                "id": data["id"],
-                "hostname": data.get("hostname"),
-                "node_type": data.get("node_type"),
-                "node_state": data.get("node_state"),
-                "capacity": data.get("capacity"),
-                "consumed_capacity": data.get("consumed_capacity"),
-                "percent_capacity_remaining": data.get("percent_capacity_remaining"),
-                "jobs_running": data.get("jobs_running", 0),
-                "jobs_total": data.get("jobs_total", 0),
-                "cpu": data.get("cpu"),
-                "memory": data.get("memory"),
-                "version": data.get("version"),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "id": data["id"],
+                    "hostname": data.get("hostname"),
+                    "node_type": data.get("node_type"),
+                    "node_state": data.get("node_state"),
+                    "capacity": data.get("capacity"),
+                    "consumed_capacity": data.get("consumed_capacity"),
+                    "percent_capacity_remaining": data.get("percent_capacity_remaining"),
+                    "jobs_running": data.get("jobs_running", 0),
+                    "jobs_total": data.get("jobs_total", 0),
+                    "cpu": data.get("cpu"),
+                    "memory": data.get("memory"),
+                    "version": data.get("version"),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -161,19 +174,22 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_get(ctx, "/instances/")
-            return json.dumps({
-                "count": data.get("count", 0),
-                "instances": [
-                    {
-                        "id": i["id"],
-                        "hostname": i.get("hostname"),
-                        "node_type": i.get("node_type"),
-                        "node_state": i.get("node_state"),
-                        "enabled": i.get("enabled"),
-                        "capacity": i.get("capacity"),
-                    }
-                    for i in data.get("results", [])
-                ],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "count": data.get("count", 0),
+                    "instances": [
+                        {
+                            "id": i["id"],
+                            "hostname": i.get("hostname"),
+                            "node_type": i.get("node_type"),
+                            "node_state": i.get("node_state"),
+                            "enabled": i.get("enabled"),
+                            "capacity": i.get("capacity"),
+                        }
+                        for i in data.get("results", [])
+                    ],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"

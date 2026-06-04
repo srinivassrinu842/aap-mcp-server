@@ -15,14 +15,13 @@ AAP API Mapping:
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
-
-from ..utils.api_client import aap_get, aap_list_all, AAPAPIError
+from ..utils.api_client import AAPAPIError, aap_get, aap_list_all
 
 
 def register(mcp: FastMCP):
@@ -235,7 +234,7 @@ def register(mcp: FastMCP):
 
     class ExportAllInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-        organization_id: Optional[int] = Field(default=None, description="Filter exports by organization ID")
+        organization_id: int | None = Field(default=None, description="Filter exports by organization ID")
         format: str = Field(default="yaml")
 
     @mcp.tool(
@@ -259,7 +258,7 @@ def register(mcp: FastMCP):
             str: Combined YAML/JSON export of all resources.
         """
         try:
-            result: Dict[str, Any] = {}
+            result: dict[str, Any] = {}
             org_filter = {"organization": params.organization_id} if params.organization_id else {}
 
             # Projects

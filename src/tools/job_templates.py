@@ -15,15 +15,20 @@ AAP API Mapping:
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, Field, ConfigDict
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.api_client import (
-    aap_get, aap_post, aap_patch, aap_delete, aap_list_all,
-    AAPAPIError, require_confirmation_token, validate_confirmation_token,
-    format_job_status, paginate_params,
+    AAPAPIError,
+    aap_delete,
+    aap_get,
+    aap_patch,
+    aap_post,
+    paginate_params,
+    require_confirmation_token,
+    validate_confirmation_token,
 )
 
 
@@ -33,9 +38,9 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         page: int = Field(default=1, ge=1)
         page_size: int = Field(default=20, ge=1, le=200)
-        search: Optional[str] = Field(default=None, description="Filter by name substring")
-        organization: Optional[int] = Field(default=None, description="Filter by organization ID")
-        project: Optional[int] = Field(default=None, description="Filter by project ID")
+        search: str | None = Field(default=None, description="Filter by name substring")
+        organization: int | None = Field(default=None, description="Filter by organization ID")
+        project: int | None = Field(default=None, description="Filter by project ID")
 
     @mcp.tool(
         name="aap_list_job_templates",
@@ -70,16 +75,20 @@ def register(mcp: FastMCP):
             results = []
             for jt in data.get("results", []):
                 sf = jt.get("summary_fields", {})
-                results.append({
-                    "id": jt["id"],
-                    "name": jt["name"],
-                    "description": jt.get("description", ""),
-                    "playbook": jt.get("playbook", ""),
-                    "project": sf.get("project", {}).get("name"),
-                    "inventory": sf.get("inventory", {}).get("name"),
-                    "ask_variables_on_launch": jt.get("ask_variables_on_launch", False),
-                    "last_job_status": sf.get("recent_jobs", [{}])[0].get("status") if sf.get("recent_jobs") else None,
-                })
+                results.append(
+                    {
+                        "id": jt["id"],
+                        "name": jt["name"],
+                        "description": jt.get("description", ""),
+                        "playbook": jt.get("playbook", ""),
+                        "project": sf.get("project", {}).get("name"),
+                        "inventory": sf.get("inventory", {}).get("name"),
+                        "ask_variables_on_launch": jt.get("ask_variables_on_launch", False),
+                        "last_job_status": (
+                            sf.get("recent_jobs", [{}])[0].get("status") if sf.get("recent_jobs") else None
+                        ),
+                    }
+                )
             return json.dumps({"count": data.get("count", 0), "results": results}, indent=2)
         except AAPAPIError as e:
             return f"Error: {e}"
@@ -106,31 +115,34 @@ def register(mcp: FastMCP):
         try:
             data = await aap_get(ctx, f"/job_templates/{params.template_id}/")
             sf = data.get("summary_fields", {})
-            return json.dumps({
-                "id": data["id"],
-                "name": data["name"],
-                "description": data.get("description", ""),
-                "job_type": data.get("job_type", "run"),
-                "playbook": data.get("playbook", ""),
-                "project": sf.get("project", {}),
-                "inventory": sf.get("inventory", {}),
-                "credentials": sf.get("credentials", []),
-                "extra_vars": data.get("extra_vars", ""),
-                "verbosity": data.get("verbosity", 0),
-                "ask_variables_on_launch": data.get("ask_variables_on_launch", False),
-                "ask_inventory_on_launch": data.get("ask_inventory_on_launch", False),
-                "ask_credential_on_launch": data.get("ask_credential_on_launch", False),
-                "become_enabled": data.get("become_enabled", False),
-                "diff_mode": data.get("diff_mode", False),
-                "survey_enabled": data.get("survey_enabled", False),
-                "created": data.get("created"),
-                "modified": data.get("modified"),
-                "related": {
-                    "launch": f"/api/v2/job_templates/{data['id']}/launch/",
-                    "jobs": f"/api/v2/job_templates/{data['id']}/jobs/",
-                    "schedules": f"/api/v2/job_templates/{data['id']}/schedules/",
+            return json.dumps(
+                {
+                    "id": data["id"],
+                    "name": data["name"],
+                    "description": data.get("description", ""),
+                    "job_type": data.get("job_type", "run"),
+                    "playbook": data.get("playbook", ""),
+                    "project": sf.get("project", {}),
+                    "inventory": sf.get("inventory", {}),
+                    "credentials": sf.get("credentials", []),
+                    "extra_vars": data.get("extra_vars", ""),
+                    "verbosity": data.get("verbosity", 0),
+                    "ask_variables_on_launch": data.get("ask_variables_on_launch", False),
+                    "ask_inventory_on_launch": data.get("ask_inventory_on_launch", False),
+                    "ask_credential_on_launch": data.get("ask_credential_on_launch", False),
+                    "become_enabled": data.get("become_enabled", False),
+                    "diff_mode": data.get("diff_mode", False),
+                    "survey_enabled": data.get("survey_enabled", False),
+                    "created": data.get("created"),
+                    "modified": data.get("modified"),
+                    "related": {
+                        "launch": f"/api/v2/job_templates/{data['id']}/launch/",
+                        "jobs": f"/api/v2/job_templates/{data['id']}/jobs/",
+                        "schedules": f"/api/v2/job_templates/{data['id']}/schedules/",
+                    },
                 },
-            }, indent=2)
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
@@ -138,8 +150,10 @@ def register(mcp: FastMCP):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         name: str = Field(..., min_length=1, max_length=512, description="Template name (e.g., 'Install Apache')")
         project_id: int = Field(..., ge=1, description="Project ID containing the playbook")
-        playbook: str = Field(..., min_length=1, description="Playbook path relative to project root (e.g., 'site.yml')")
-        inventory_id: Optional[int] = Field(default=None, ge=1, description="Inventory ID (can be asked at launch)")
+        playbook: str = Field(
+            ..., min_length=1, description="Playbook path relative to project root (e.g., 'site.yml')"
+        )
+        inventory_id: int | None = Field(default=None, ge=1, description="Inventory ID (can be asked at launch)")
         description: str = Field(default="", description="Optional description")
         job_type: str = Field(default="run", description="Job type: 'run' or 'check'")
         verbosity: int = Field(default=0, ge=0, le=5, description="Ansible verbosity (0=normal, 5=maximum)")
@@ -148,7 +162,7 @@ def register(mcp: FastMCP):
         ask_variables_on_launch: bool = Field(default=False)
         ask_inventory_on_launch: bool = Field(default=False)
         ask_credential_on_launch: bool = Field(default=False)
-        credential_ids: Optional[List[int]] = Field(default=None, description="List of credential IDs to attach")
+        credential_ids: list[int] | None = Field(default=None, description="List of credential IDs to attach")
 
     @mcp.tool(
         name="aap_create_job_template",
@@ -167,7 +181,7 @@ def register(mcp: FastMCP):
             str: JSON with created template id, name, and launch URL.
         """
         try:
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "name": params.name,
                 "description": params.description,
                 "job_type": params.job_type,
@@ -191,33 +205,35 @@ def register(mcp: FastMCP):
                 for cred_id in params.credential_ids:
                     try:
                         await aap_post(ctx, f"/job_templates/{jt_id}/credentials/", {"id": cred_id})
-                    except AAPAPIError as ce:
+                    except AAPAPIError:
                         pass  # Non-fatal; report in response
 
-            return json.dumps({
-                "success": True,
-                "id": jt_id,
-                "name": data["name"],
-                "launch_url": f"/api/v2/job_templates/{jt_id}/launch/",
-                "credentials_attached": params.credential_ids or [],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "id": jt_id,
+                    "name": data["name"],
+                    "launch_url": f"/api/v2/job_templates/{jt_id}/launch/",
+                    "credentials_attached": params.credential_ids or [],
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class LaunchJTInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         template_id: int = Field(..., ge=1, description="Job template ID to launch")
-        extra_vars: Optional[str] = Field(
-            default=None,
-            description="Extra variables as JSON or YAML string to pass at launch"
+        extra_vars: str | None = Field(
+            default=None, description="Extra variables as JSON or YAML string to pass at launch"
         )
-        inventory_id: Optional[int] = Field(default=None, ge=1, description="Override inventory ID at launch")
-        credential_id: Optional[int] = Field(default=None, ge=1, description="Override credential at launch")
-        limit: Optional[str] = Field(default=None, description="Host limit pattern (e.g., 'web01.example.com')")
-        tags: Optional[str] = Field(default=None, description="Ansible tags to run (comma-separated)")
-        skip_tags: Optional[str] = Field(default=None, description="Ansible tags to skip")
-        verbosity: Optional[int] = Field(default=None, ge=0, le=5, description="Override verbosity level")
-        diff_mode: Optional[bool] = Field(default=None, description="Enable diff mode for this run")
+        inventory_id: int | None = Field(default=None, ge=1, description="Override inventory ID at launch")
+        credential_id: int | None = Field(default=None, ge=1, description="Override credential at launch")
+        limit: str | None = Field(default=None, description="Host limit pattern (e.g., 'web01.example.com')")
+        tags: str | None = Field(default=None, description="Ansible tags to run (comma-separated)")
+        skip_tags: str | None = Field(default=None, description="Ansible tags to skip")
+        verbosity: int | None = Field(default=None, ge=0, le=5, description="Override verbosity level")
+        diff_mode: bool | None = Field(default=None, description="Enable diff mode for this run")
 
     @mcp.tool(
         name="aap_launch_job_template",
@@ -249,7 +265,7 @@ def register(mcp: FastMCP):
             str: JSON with job id, status, url, and monitoring instructions.
         """
         try:
-            payload: Dict[str, Any] = {}
+            payload: dict[str, Any] = {}
             if params.extra_vars:
                 payload["extra_vars"] = params.extra_vars
             if params.inventory_id:
@@ -269,23 +285,23 @@ def register(mcp: FastMCP):
 
             data = await aap_post(ctx, f"/job_templates/{params.template_id}/launch/", payload)
             job_id = data.get("id")
-            return json.dumps({
-                "success": True,
-                "job_id": job_id,
-                "status": data.get("status", "pending"),
-                "job_url": f"/api/v2/jobs/{job_id}/",
-                "monitor_tip": f"Use aap_get_job_output(job_id={job_id}) to stream output or aap_list_running_jobs() to check status.",
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "job_id": job_id,
+                    "status": data.get("status", "pending"),
+                    "job_url": f"/api/v2/jobs/{job_id}/",
+                    "monitor_tip": f"Use aap_get_job_output(job_id={job_id}) to stream output or aap_list_running_jobs() to check status.",
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class RelaunchJobInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         job_id: int = Field(..., ge=1, description="Job ID to relaunch")
-        hosts: str = Field(
-            default="all",
-            description="Which hosts to relaunch against: 'all' or 'failed'"
-        )
+        hosts: str = Field(default="all", description="Which hosts to relaunch against: 'all' or 'failed'")
 
     @mcp.tool(
         name="aap_relaunch_job",
@@ -304,18 +320,21 @@ def register(mcp: FastMCP):
         """
         try:
             data = await aap_post(ctx, f"/jobs/{params.job_id}/relaunch/", {"hosts": params.hosts})
-            return json.dumps({
-                "success": True,
-                "new_job_id": data.get("id"),
-                "status": data.get("status"),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "success": True,
+                    "new_job_id": data.get("id"),
+                    "status": data.get("status"),
+                },
+                indent=2,
+            )
         except AAPAPIError as e:
             return f"Error: {e}"
 
     class CancelJobInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         job_id: int = Field(..., ge=1, description="Running job ID to cancel")
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_cancel_job",
@@ -350,7 +369,7 @@ def register(mcp: FastMCP):
     class DeleteJTInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         template_id: int = Field(..., ge=1)
-        confirmation_token: Optional[str] = Field(default=None)
+        confirmation_token: str | None = Field(default=None)
 
     @mcp.tool(
         name="aap_delete_job_template",
@@ -416,13 +435,13 @@ def register(mcp: FastMCP):
     class UpdateJTInput(BaseModel):
         model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
         template_id: int = Field(..., ge=1)
-        name: Optional[str] = Field(default=None, min_length=1, max_length=512)
-        description: Optional[str] = Field(default=None)
-        playbook: Optional[str] = Field(default=None, min_length=1)
-        inventory_id: Optional[int] = Field(default=None, ge=1)
-        extra_vars: Optional[str] = Field(default=None)
-        verbosity: Optional[int] = Field(default=None, ge=0, le=5)
-        become_enabled: Optional[bool] = Field(default=None)
+        name: str | None = Field(default=None, min_length=1, max_length=512)
+        description: str | None = Field(default=None)
+        playbook: str | None = Field(default=None, min_length=1)
+        inventory_id: int | None = Field(default=None, ge=1)
+        extra_vars: str | None = Field(default=None)
+        verbosity: int | None = Field(default=None, ge=0, le=5)
+        become_enabled: bool | None = Field(default=None)
 
     @mcp.tool(
         name="aap_update_job_template",
@@ -440,15 +459,19 @@ def register(mcp: FastMCP):
             str: JSON with updated template id and name.
         """
         try:
-            payload = {k: v for k, v in {
-                "name": params.name,
-                "description": params.description,
-                "playbook": params.playbook,
-                "inventory": params.inventory_id,
-                "extra_vars": params.extra_vars,
-                "verbosity": params.verbosity,
-                "become_enabled": params.become_enabled,
-            }.items() if v is not None}
+            payload = {
+                k: v
+                for k, v in {
+                    "name": params.name,
+                    "description": params.description,
+                    "playbook": params.playbook,
+                    "inventory": params.inventory_id,
+                    "extra_vars": params.extra_vars,
+                    "verbosity": params.verbosity,
+                    "become_enabled": params.become_enabled,
+                }.items()
+                if v is not None
+            }
 
             if not payload:
                 return "Error: No fields to update."
