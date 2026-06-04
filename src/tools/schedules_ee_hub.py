@@ -15,7 +15,7 @@ AAP API Mapping:
 """
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, ConfigDict, Field
