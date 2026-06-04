@@ -1,0 +1,94 @@
+---
+# OpenShift Route - exposes the MCP server externally via HTTPS
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: aap-mcp-server
+  labels:
+    app: aap-mcp-server
+  annotations:
+    haproxy.router.openshift.io/timeout: "120s"
+spec:
+  to:
+    kind: Service
+    name: aap-mcp-server
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+
+---
+# NetworkPolicy - restrict ingress to only MCP clients and monitoring
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: aap-mcp-server
+  labels:
+    app: aap-mcp-server
+spec:
+  podSelector:
+    matchLabels:
+      app: aap-mcp-server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from OpenShift router (Route)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Allow from within namespace (Claude, other MCP clients)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    # Allow outbound to AAP Controller (HTTPS)
+    - ports:
+        - protocol: TCP
+          port: 443
+    # Allow DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+
+---
+# OpenShift SCC - use restricted-v2 (default for OCP 4.11+)
+# No SCC override needed if deployment uses runAsNonRoot: true
+
+---
+# HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: aap-mcp-server
+  labels:
+    app: aap-mcp-server
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aap-mcp-server
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

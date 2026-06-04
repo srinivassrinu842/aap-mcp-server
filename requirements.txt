@@ -1,0 +1,19 @@
+# AAP MCP Server - Python Dependencies
+# Core MCP framework
+mcp[cli]>=1.3.0
+
+# HTTP client (async)
+httpx>=0.27.0
+
+# Configuration management
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# YAML export support
+pyyaml>=6.0.1
+
+# Production server (for streamable HTTP transport)
+uvicorn[standard]>=0.30.0
+
+# Dev / test dependencies (install with: pip install -r requirements-dev.txt)
+# See requirements-dev.txt

@@ -1,0 +1,166 @@
+---
+# AAP MCP Server - Kubernetes Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aap-mcp-server
+  labels:
+    app: aap-mcp-server
+    version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aap-mcp-server
+  template:
+    metadata:
+      labels:
+        app: aap-mcp-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: aap-mcp-server
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: aap-mcp-server
+          image: quay.io/your-org/aap-mcp-server:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: AAP_CONTROLLER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: aap-mcp-credentials
+                  key: controller-url
+            - name: AAP_OAUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aap-mcp-credentials
+                  key: oauth-token
+            - name: AAP_VERIFY_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: aap-mcp-config
+                  key: verify-ssl
+            - name: AAP_MCP_READ_ONLY_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: aap-mcp-config
+                  key: read-only-mode
+            - name: AAP_MCP_REQUIRE_CONFIRMATION
+              valueFrom:
+                configMapKeyRef:
+                  name: aap-mcp-config
+                  key: require-confirmation
+            - name: MCP_TRANSPORT
+              value: "streamable_http"
+            - name: MCP_PORT
+              value: "8000"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: audit-logs
+              mountPath: /var/log/aap-mcp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: audit-logs
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - aap-mcp-server
+                topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aap-mcp-server
+  labels:
+    app: aap-mcp-server
+spec:
+  selector:
+    app: aap-mcp-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aap-mcp-server
+  labels:
+    app: aap-mcp-server
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aap-mcp-config
+  labels:
+    app: aap-mcp-server
+data:
+  verify-ssl: "true"
+  read-only-mode: "false"
+  require-confirmation: "true"
+  rate-limit-rpm: "120"
+  max-page-size: "200"
+  audit-log-file: "/var/log/aap-mcp/audit.jsonl"
+
+---
+# Secret - populate via Sealed Secrets, Vault, or kubectl create secret
+# kubectl create secret generic aap-mcp-credentials \
+#   --from-literal=controller-url='https://controller.example.com' \
+#   --from-literal=oauth-token='your-aap-oauth-token'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aap-mcp-credentials
+  labels:
+    app: aap-mcp-server
+type: Opaque
+stringData:
+  controller-url: "https://your-aap-controller.example.com"
+  oauth-token: "REPLACE_WITH_AAP_OAUTH_TOKEN"

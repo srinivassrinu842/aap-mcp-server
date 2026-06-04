@@ -1,0 +1,78 @@
+# Default values for aap-mcp-server Helm chart
+# Override with: helm install aap-mcp ./helm/aap-mcp -f my-values.yaml
+
+replicaCount: 2
+
+image:
+  repository: quay.io/your-org/aap-mcp-server
+  tag: "latest"
+  pullPolicy: Always
+
+# AAP connection (set via --set or sealed-secrets)
+aap:
+  controllerUrl: "https://your-aap-controller.example.com"
+  # oauthToken - provide via existing secret (recommended) or direct set (dev only)
+  existingSecret: ""         # Name of existing k8s Secret with keys: controller-url, oauth-token
+  oauthToken: ""             # Directly set token (use existingSecret in production)
+  verifySsl: true
+
+# MCP server behavior
+server:
+  readOnlyMode: false
+  requireConfirmation: true
+  rateLimitRpm: 120
+  maxPageSize: 200
+  transport: "streamable_http"
+  port: 8000
+
+# Ingress / Route
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: aap-mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# OpenShift Route (alternative to ingress)
+route:
+  enabled: false
+  host: ""
+  tlsTermination: edge
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Audit logging
+audit:
+  enabled: true
+  persistentVolume:
+    enabled: false
+    storageClass: ""
+    size: 1Gi

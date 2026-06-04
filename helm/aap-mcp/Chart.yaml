@@ -1,0 +1,13 @@
+apiVersion: v2
+name: aap-mcp-server
+description: Enterprise MCP Server for Ansible Automation Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - mcp
+  - ansible
+  - aap
+  - automation
+maintainers:
+  - name: NESA OCP Operational Support
